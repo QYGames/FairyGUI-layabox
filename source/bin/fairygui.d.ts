@@ -5,6 +5,7 @@ declare namespace fgui {
         static get inst(): AssetProxy;
         getRes(url: string, type?: string): any;
         getItemRes(item: PackageItem): any;
+        clearItemRes(item: PackageItem): void;
         load(url: string | Laya.ILoadURL | (string | Readonly<Laya.ILoadURL>)[], type?: string, onProgress?: Laya.ProgressCallback): Promise<any>;
     }
 }
@@ -472,7 +473,7 @@ declare namespace fgui {
         onClick(thisObj: any, listener: Function, args?: any[]): void;
         offClick(thisObj: any, listener: Function): void;
         hasClickListener(): boolean;
-        on(type: string, thisObject: any, listener: Function, args?: any[]): void;
+        on(type: string, thisObject: any, listener: Function, args?: any[]): Function;
         off(type: string, thisObject: any, listener: Function): void;
         get draggable(): boolean;
         set draggable(value: boolean);
@@ -505,11 +506,11 @@ declare namespace fgui {
         private __begin;
         private __moving;
         private __end;
-        static cast(sprite: Laya.Sprite): GObject;
     }
     const BlendMode: {
         2: string;
     };
+    function cast<T extends GObject>(sprite: Laya.Sprite): T;
 }
 declare namespace fgui {
     class Margin {
@@ -593,6 +594,7 @@ declare namespace fgui {
         protected updateMask(): void;
         protected setupScroll(buffer: ByteBuffer): void;
         protected setupOverflow(overflow: number): void;
+        protected createContainer(): void;
         protected handleSizeChanged(): void;
         protected handleGrayedChanged(): void;
         handleControllerChanged(c: Controller): void;
@@ -615,6 +617,7 @@ declare namespace fgui {
         constructFromResource2(objectPool: GObject[], poolIndex: number): void;
         protected constructExtension(buffer: ByteBuffer): void;
         protected onConstruct(): void;
+        protected onDispose(): void;
         protected constructFromXML(xml: Object): void;
         setup_afterAdd(buffer: ByteBuffer, beginPos: number): void;
         private ___added;
@@ -1123,8 +1126,8 @@ declare namespace fgui {
         private _skinName;
         private _color;
         private _contentItem;
-        private _container;
-        private _content;
+        protected _container: Laya.Sprite;
+        protected _content: Laya.Sprite;
         private _updatingLayout;
         constructor();
         protected createDisplayObject(): void;
@@ -1162,8 +1165,8 @@ declare namespace fgui {
         setSkeleton(skeleton: Laya.Skeleton | Laya.SpineSkeleton, anchor?: Laya.Point): void;
         private onChange;
         protected loadExternal(): void;
-        private updateLayout;
-        private clearContent;
+        protected updateLayout(): void;
+        protected clearContent(): void;
         protected handleSizeChanged(): void;
         protected handleGrayedChanged(): void;
         getProp(index: number): any;
@@ -1336,7 +1339,8 @@ declare namespace fgui {
         private setFocus;
         get volumeScale(): number;
         set volumeScale(value: number);
-        playOneShotSound(url: string, volumeScale?: number): void;
+        playOneShotSound(url: string, volumeScale?: number): any;
+        playOneShotSound(url: PackageItem, volumeScale?: number): any;
         private adjustModalLayer;
         private __addedToStage;
         checkPopups(clickTarget: Laya.Sprite): void;
@@ -1868,6 +1872,8 @@ declare namespace fgui {
 declare namespace fgui {
     class UIConfig {
         constructor();
+        static fontRemaps: Record<string, string>;
+        protected static _defaultFont: string;
         static get defaultFont(): string;
         static set defaultFont(value: string);
         static windowModalWaiting: string;
@@ -2085,16 +2091,7 @@ declare namespace fgui {
         private _mask?;
         private _color;
         constructor();
-        /**
-         * @internal
-         * @param value
-         */
-        set_width(value: number): void;
-        /**
-         * @internal
-         * @param value
-         */
-        set_height(value: number): void;
+        size(width: number, height: number): Laya.Sprite;
         protected _transChanged(kind: Laya.TransformKind): void;
         get texture(): Laya.Texture;
         set texture(value: Laya.Texture);

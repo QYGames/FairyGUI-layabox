@@ -15,6 +15,11 @@
         getItemRes(item) {
             return this.getRes(item.file);
         }
+        clearItemRes(item) {
+            if (item.file) {
+                Laya.loader.clearRes(item.file);
+            }
+        }
         load(url, type, onProgress) {
             return this.loader.load(url, type, onProgress);
         }
@@ -461,7 +466,7 @@
             fgui.GRoot.inst.removeChild(this._agent);
             var sourceData = this._sourceData;
             this._sourceData = null;
-            var obj = fgui.GObject.cast(evt.target);
+            var obj = fgui.cast(evt.target);
             while (obj) {
                 if (obj.displayObject.hasListener(fgui.Events.DROP)) {
                     obj.requestFocus();
@@ -761,6 +766,9 @@
         }
         set name(value) {
             this._name = value;
+            if (this.displayObject) {
+                this._displayObject.name = value;
+            }
         }
         get x() {
             return this._x;
@@ -1333,6 +1341,7 @@
         }
         on(type, thisObject, listener, args) {
             this._displayObject.on(type, thisObject, listener, args);
+            return listener;
         }
         off(type, thisObject, listener) {
             this._displayObject.off(type, thisObject, listener);
@@ -1502,7 +1511,7 @@
             var f1;
             var f2;
             this._id = buffer.readS();
-            this._name = buffer.readS();
+            this.name = buffer.readS();
             f1 = buffer.getInt32();
             f2 = buffer.getInt32();
             this.setXY(f1, f2);
@@ -1668,10 +1677,6 @@
                 this.reset();
             }
         }
-        //-------------------------------------------------------------------
-        static cast(sprite) {
-            return (sprite["$owner"]);
-        }
     }
     fgui.GObject = GObject;
     fgui.BlendMode = {
@@ -1679,6 +1684,10 @@
         //3: Laya.BlendMode.MULTIPLY,
         //4: Laya.BlendMode.SCREEN
     };
+    function cast(sprite) {
+        return (sprite["$owner"]);
+    }
+    fgui.cast = cast;
     var _gInstanceCounter = 0;
     var sGlobalDragStart = new Laya.Point();
     var sGlobalRect = new Laya.Rectangle();
@@ -1731,6 +1740,7 @@
             this._container = this._displayObject;
         }
         dispose() {
+            this.onDispose();
             var i;
             var cnt;
             cnt = this._transitions.length;
@@ -2313,28 +2323,26 @@
             this._displayObject.scrollRect = rect;
         }
         setupScroll(buffer) {
-            if (this._displayObject == this._container) {
-                this._container = new Laya.Sprite();
-                this._displayObject.addChild(this._container);
-            }
+            this.createContainer();
             this._scrollPane = new fgui.ScrollPane(this);
             this._scrollPane.setup(buffer);
         }
         setupOverflow(overflow) {
             if (overflow == fgui.OverflowType.Hidden) {
-                if (this._displayObject == this._container) {
-                    this._container = new Laya.Sprite();
-                    this._displayObject.addChild(this._container);
-                }
+                this.createContainer();
                 this.updateMask();
                 this._container.pos(this._margin.left, this._margin.top);
             }
             else if (this._margin.left != 0 || this._margin.top != 0) {
-                if (this._displayObject == this._container) {
-                    this._container = new Laya.Sprite();
-                    this._displayObject.addChild(this._container);
-                }
+                this.createContainer();
                 this._container.pos(this._margin.left, this._margin.top);
+            }
+        }
+        createContainer() {
+            if (this._displayObject == this._container) {
+                this._container = new Laya.Sprite();
+                this._container.name = '<Container>';
+                this._displayObject.addChild(this._container);
             }
         }
         handleSizeChanged() {
@@ -2706,6 +2714,8 @@
         }
         onConstruct() {
             this.constructFromXML(null); //old version
+        }
+        onDispose() {
         }
         constructFromXML(xml) {
         }
@@ -3161,9 +3171,9 @@
             if (this._sound) {
                 var pi = fgui.UIPackage.getItemByURL(this._sound);
                 if (pi)
-                    fgui.GRoot.inst.playOneShotSound(pi.file);
+                    fgui.GRoot.inst.playOneShotSound(pi, this._soundVolumeScale);
                 else
-                    fgui.GRoot.inst.playOneShotSound(this._sound);
+                    fgui.GRoot.inst.playOneShotSound(this._sound, this._soundVolumeScale);
             }
             if (this._mode == fgui.ButtonMode.Check) {
                 if (this._changeStateOnClick) {
@@ -4511,6 +4521,7 @@
             this._align = "left";
             this._verticalAlign = "top";
             this._container = new Laya.Sprite();
+            this._container.name = '<Container>';
             this._displayObject.addChild(this._container);
         }
         dispose() {
@@ -5023,7 +5034,7 @@
         __clickItem(evt) {
             if (this._scrollPane && this._scrollPane.isDragged)
                 return;
-            var item = fgui.GObject.cast(evt.currentTarget);
+            var item = fgui.cast(evt.currentTarget);
             this.setSelectionOnEvent(item, evt);
             if (this._scrollPane && this.scrollItemToViewOnClick)
                 this._scrollPane.scrollToView(item, true);
@@ -6623,6 +6634,7 @@
         createDisplayObject() {
             super.createDisplayObject();
             this._content = new fgui.MovieClip();
+            this._content.name = "<Image>";
             this._displayObject.addChild(this._content);
             this._displayObject.mouseEnabled = true;
         }
@@ -6819,6 +6831,7 @@
                     }
                     else {
                         this._content2 = obj.asCom;
+                        this._content2.name = obj.name || this._contentItem.name || "<Content>";
                         this._displayObject.addChild(this._content2.displayObject);
                         this.updateLayout();
                     }
@@ -6862,6 +6875,7 @@
                 }
             }
             if (this._errorSign) {
+                this._errorSign.name = this._errorSign.name || "<ErrorSign>";
                 this._errorSign.setSize(this.width, this.height);
                 this._displayObject.addChild(this._errorSign.displayObject);
             }
@@ -7067,9 +7081,11 @@
         createDisplayObject() {
             super.createDisplayObject();
             this._container = new Laya.Sprite();
+            this._container.name = '<Container>';
             this._displayObject.addChild(this._container);
         }
         dispose() {
+            this.clearContent();
             super.dispose();
         }
         get url() {
@@ -7224,16 +7240,15 @@
             let templet = this._contentItem.templet;
             if (!templet)
                 return;
-            if (templet instanceof Laya.Templet)
+            if (Laya.Templet && templet instanceof Laya.Templet)
                 this.setSkeleton(templet.buildArmature(1), this._contentItem.skeletonAnchor);
-            else {
+            else if (Laya.SpineSkeleton && templet instanceof Laya.SpineTemplet) {
                 let obj = new Laya.SpineSkeleton();
                 obj.templet = templet;
                 this.setSkeleton(obj, this._contentItem.skeletonAnchor);
             }
         }
         setSkeleton(skeleton, anchor) {
-            this.url = null;
             this._content = skeleton;
             this._container.addChild(this._content);
             this._content.pos(anchor.x, anchor.y);
@@ -7242,20 +7257,21 @@
             this.updateLayout();
         }
         onChange() {
-            if (!this._content)
+            if (!this._content || !((Laya.Skeleton && this._content instanceof Laya.Skeleton) || (Laya.SpineSkeleton && this._content instanceof Laya.SpineSkeleton)))
                 return;
+            const content = this._content;
             if (this._animationName) {
                 if (this._playing)
-                    this._content.play(this._animationName, this._loop);
+                    content.play(this._animationName, this._loop);
                 else
-                    this._content.play(this._animationName, false, true, this._frame, this._frame);
+                    content.play(this._animationName, false, true, this._frame, this._frame);
             }
             else
-                this._content.stop();
+                content.stop();
             if (this._skinName)
-                this._content.showSkinByName(this._skinName);
+                content.showSkinByName(this._skinName);
             else
-                this._content.showSkinByIndex(0);
+                content.showSkinByIndex(0);
         }
         loadExternal() {
         }
@@ -7324,11 +7340,14 @@
             this._container.pos(nx, ny);
         }
         clearContent() {
-            this._contentItem = null;
             if (this._content) {
                 this._container.removeChild(this._content);
                 this._content.destroy();
                 this._content = null;
+            }
+            if (this._contentItem && !this._contentItem.loading) {
+                fgui.AssetProxy.inst.clearItemRes(this._contentItem);
+                this._contentItem = null;
             }
         }
         handleSizeChanged() {
@@ -7973,7 +7992,8 @@ const labelPadding = [2, 2, 2, 2];
             this.opaque = false;
             this._popupStack = [];
             this._justClosedPopups = [];
-            this.displayObject.once(Laya.Event.DISPLAY, this, this.__addedToStage);
+            this.name = 'GRoot';
+            this.displayObject.once(Laya.Event.ADDED, this, this.__addedToStage);
         }
         showWindow(win) {
             this.addChild(win);
@@ -8209,9 +8229,17 @@ const labelPadding = [2, 2, 2, 2];
         set volumeScale(value) {
             Laya.SoundManager.soundVolume = value;
         }
-        playOneShotSound(url, volumeScale) {
-            if (fgui.ToolSet.startsWith(url, "ui://"))
-                return;
+        playOneShotSound(item, volumeScale) {
+            let url;
+            if (typeof item === 'string') {
+                url = item;
+                if (fgui.ToolSet.startsWith(url, "ui://")) {
+                    item = fgui.UIPackage.getItemByURL(url);
+                }
+            }
+            if (item) {
+                url = item.file;
+            }
             Laya.SoundManager.playSound(url);
         }
         adjustModalLayer() {
@@ -8990,7 +9018,7 @@ const labelPadding = [2, 2, 2, 2];
             }
         }
         __cellMouseDown(evt) {
-            var node = fgui.GObject.cast(evt.currentTarget)._treeNode;
+            var node = fgui.cast(evt.currentTarget)._treeNode;
             this._expandedStatusInEvt = node.expanded;
         }
         __expandedStateChanged(cc) {
@@ -10151,6 +10179,7 @@ const labelPadding = [2, 2, 2, 2];
         constructor(owner) {
             this._owner = owner;
             this._maskContainer = new Laya.Sprite();
+            this._maskContainer.name = '<ScrollPane>';
             this._owner.displayObject.addChild(this._maskContainer);
             this._container = this._owner._container;
             this._container.pos(0, 0);
@@ -12466,7 +12495,7 @@ const labelPadding = [2, 2, 2, 2];
                         if (value.audioClip == null) {
                             var pi = fgui.UIPackage.getItemByURL(value.sound);
                             if (pi)
-                                value.audioClip = pi.file;
+                                value.audioClip = pi;
                             else
                                 value.audioClip = value.sound;
                         }
@@ -12863,9 +12892,13 @@ const labelPadding = [2, 2, 2, 2];
         constructor() {
         }
         //Default font name
-        static get defaultFont() { return Laya.Config.defaultFont; }
-        static set defaultFont(value) { Laya.Config.defaultFont = value; }
+        static get defaultFont() { return this._defaultFont; }
+        static set defaultFont(value) {
+            Laya.Config.defaultFont = this._defaultFont = this.fontRemaps[value] || value;
+        }
     }
+    UIConfig.fontRemaps = {};
+    UIConfig._defaultFont = Laya.Config.defaultFont;
     //When a modal window is in front, the background becomes dark.
     UIConfig.modalLayerColor = "rgba(33,33,33,0.2)";
     UIConfig.buttonSoundVolumeScale = 1;
@@ -13468,6 +13501,7 @@ const labelPadding = [2, 2, 2, 2];
         }
         internalCreateObject(item, userClass) {
             var g = fgui.UIObjectFactory.newObject(item, userClass);
+            g.name = g.name || item.name;
             if (g == null)
                 return null;
             UIPackage._constructing++;
@@ -13486,9 +13520,8 @@ const labelPadding = [2, 2, 2, 2];
         }
         getItemAssetByName(resName) {
             var pi = this._itemsByName[resName];
-            if (pi == null) {
-                throw "Resource not found -" + resName;
-            }
+            if (!pi)
+                return null;
             return this.getItemAsset(pi);
         }
         getItemAsset(item) {
@@ -13532,6 +13565,7 @@ const labelPadding = [2, 2, 2, 2];
                     return item.frames;
                 case fgui.PackageItemType.Component:
                     return item.rawData;
+                case fgui.PackageItemType.Sound:
                 case fgui.PackageItemType.Misc:
                     if (item.file)
                         return fgui.AssetProxy.inst.getItemRes(item);
@@ -13693,6 +13727,7 @@ const labelPadding = [2, 2, 2, 2];
                     this.removeChild(this._contentPane);
                 this._contentPane = val;
                 if (this._contentPane) {
+                    this._contentPane.name = this._contentPane.name || 'contentPane';
                     this.addChild(this._contentPane);
                     this.setSize(this._contentPane.width, this._contentPane.height);
                     this._contentPane.addRelation(this, fgui.RelationType.Size);
@@ -13892,7 +13927,7 @@ const labelPadding = [2, 2, 2, 2];
                 this.bringToFront();
         }
         __dragStart(evt) {
-            fgui.GObject.cast(evt.currentTarget).stopDrag();
+            fgui.cast(evt.currentTarget).stopDrag();
             this.startDrag();
         }
     }
@@ -14298,23 +14333,9 @@ const labelPadding = [2, 2, 2, 2];
             this.mouseEnabled = false;
             this._color = "#FFFFFF";
         }
-        /**
-         * @internal
-         * @param value
-         */
-        set_width(value) {
-            //@ts-ignore 3.3 remove this
-            super.set_width(value);
+        size(width, height) {
             this.markChanged(1);
-        }
-        /**
-         * @internal
-         * @param value
-         */
-        set_height(value) {
-            //@ts-ignore 3.3 remove this
-            super.set_height(value);
-            this.markChanged(1);
+            return super.size(width, height);
         }
         //@ts-ignore 3.3 add this
         _transChanged(kind) {
